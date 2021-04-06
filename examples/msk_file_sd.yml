@@ -1,0 +1,10 @@
+# Example output file for a single cluster with 2 brokers with JMX and Node monitoring enabled
+- targets:
+    - b-1.primary-kafka.tffs8g.c2.kafka.eu-west-2.amazonaws.com:11001
+    - b-1.primary-kafka.tffs8g.c2.kafka.eu-west-2.amazonaws.com:11002
+    - b-2.primary-kafka.tffs8g.c2.kafka.eu-west-2.amazonaws.com:11001
+    - b-2.primary-kafka.tffs8g.c2.kafka.eu-west-2.amazonaws.com:11002
+  labels:
+    job: msk-primary-kafka
+    cluster_name: primary-kafka
+    cluster_arn: arn:aws:kafka:eu-west-2:111111111111:cluster/primary-kafka/522d90ab-d400-4ea0-b8fd-bbf3576425d4-2
