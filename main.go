@@ -88,7 +88,6 @@ func GetClusters(svc kafkaClient) (*kafka.ListClustersOutput, error) {
 }
 
 // GetBrokers returns a slice of broker hosts without ports
-// func GetBrokers(svc *kafka.Client, arn string) ([]string, error) {
 func GetBrokers(svc kafkaClient, arn string) ([]string, error) {
 	input := &kafka.GetBootstrapBrokersInput{ClusterArn: &arn}
 	r, err := svc.GetBootstrapBrokers(context.Background(), input)
