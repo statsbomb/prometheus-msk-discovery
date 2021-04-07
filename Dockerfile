@@ -8,4 +8,3 @@ FROM alpine:latest
 RUN apk --no-cache add ca-certificates
 COPY --from=0 /bin/prometheus-msk-discovery /bin/
 ENTRYPOINT ["prometheus-msk-discovery"]
-

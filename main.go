@@ -80,7 +80,7 @@ func GetClusters(svc kafkaClient) (*kafka.ListClustersOutput, error) {
 	for p.HasMorePages() {
 		page, err := p.NextPage(context.TODO())
 		if err != nil {
-			log.Fatal("failed to get page", err)
+			return &kafka.ListClustersOutput{}, err
 		}
 		output.ClusterInfoList = append(output.ClusterInfoList, page.ClusterInfoList...)
 	}
@@ -120,29 +120,46 @@ func BuildClusterDetails(svc kafkaClient, c types.ClusterInfo) (clusterDetails, 
 	return cluster, nil
 }
 
-func GetStaticConfigs(svc kafkaClient) []PrometheusStaticConfig {
-	clusters, _ := GetClusters(svc)
+func GetStaticConfigs(svc kafkaClient) ([]PrometheusStaticConfig, error) {
+	clusters, err := GetClusters(svc)
+	if err != nil {
+		return []PrometheusStaticConfig{}, err
+	}
 	staticConfigs := []PrometheusStaticConfig{}
 
 	for _, cluster := range clusters.ClusterInfoList {
-		clusterDetails, _ := BuildClusterDetails(svc, cluster)
+		clusterDetails, err := BuildClusterDetails(svc, cluster)
+		if err != nil {
+			return []PrometheusStaticConfig{}, err
+		}
+
 		if !clusterDetails.JmxExporter && !clusterDetails.NodeExporter {
 			continue
 		}
 		staticConfigs = append(staticConfigs, clusterDetails.StaticConfig())
 	}
-	return staticConfigs
+	return staticConfigs, nil
 }
 
 func main() {
 	flag.Parse()
 
-	cfg, _ := config.LoadDefaultConfig(context.TODO())
+	cfg, err := config.LoadDefaultConfig(context.TODO())
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
 	client := kafka.NewFromConfig(cfg)
 
 	work := func() {
 
-		staticConfigs := GetStaticConfigs(client)
+		staticConfigs, err := GetStaticConfigs(client)
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+
 		m, err := yaml.Marshal(staticConfigs)
 		if err != nil {
 			fmt.Println(err)

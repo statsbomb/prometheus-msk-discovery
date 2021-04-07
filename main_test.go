@@ -75,7 +75,7 @@ func TestGetStaticConfigs(t *testing.T) {
 		client.clusters = make(map[string]mockCluster)
 		client.clusters["arn:::my-cluster"] = mockCluster{2, "my-cluster", true, true}
 
-		got := GetStaticConfigs(client)
+		got, _ := GetStaticConfigs(client)
 		want := []PrometheusStaticConfig{
 			{
 				Targets: []string{
@@ -102,7 +102,7 @@ func TestGetStaticConfigs(t *testing.T) {
 		client.clusters["arn:::my-cluster"] = mockCluster{2, "my-cluster", true, true}
 		client.clusters["arn:::my-other-cluster"] = mockCluster{2, "my-other-cluster", true, false}
 
-		got := GetStaticConfigs(client)
+		got, _ := GetStaticConfigs(client)
 		want := []PrometheusStaticConfig{
 			{
 				Targets: []string{
@@ -139,7 +139,7 @@ func TestGetStaticConfigs(t *testing.T) {
 		client.clusters = make(map[string]mockCluster)
 		client.clusters["arn:::my-cluster"] = mockCluster{2, "my-cluster", false, false}
 
-		got := GetStaticConfigs(client)
+		got, _ := GetStaticConfigs(client)
 		want := []PrometheusStaticConfig{}
 
 		if !reflect.DeepEqual(got, want) {
@@ -151,7 +151,7 @@ func TestGetStaticConfigs(t *testing.T) {
 		var client mockKafkaClient
 		client.clusters = make(map[string]mockCluster)
 
-		got := GetStaticConfigs(client)
+		got, _ := GetStaticConfigs(client)
 		want := []PrometheusStaticConfig{}
 		if !reflect.DeepEqual(got, want) {
 			t.Errorf("got %s want %s", got, want)
