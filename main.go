@@ -71,8 +71,8 @@ func (c clusterDetails) StaticConfig() PrometheusStaticConfig {
 	return ret
 }
 
-// GetClusters returns a ListClusterOutput of MSK cluster details
-func GetClusters(svc kafkaClient) (*kafka.ListClustersOutput, error) {
+// getClusters returns a ListClusterOutput of MSK cluster details
+func getClusters(svc kafkaClient) (*kafka.ListClustersOutput, error) {
 	input := &kafka.ListClustersInput{}
 	output := &kafka.ListClustersOutput{}
 
@@ -87,8 +87,8 @@ func GetClusters(svc kafkaClient) (*kafka.ListClustersOutput, error) {
 	return output, nil
 }
 
-// GetBrokers returns a slice of broker hosts without ports
-func GetBrokers(svc kafkaClient, arn string) ([]string, error) {
+// getBrokers returns a slice of broker hosts without ports
+func getBrokers(svc kafkaClient, arn string) ([]string, error) {
 	input := &kafka.GetBootstrapBrokersInput{ClusterArn: &arn}
 	r, err := svc.GetBootstrapBrokers(context.Background(), input)
 	if err != nil {
@@ -102,9 +102,9 @@ func GetBrokers(svc kafkaClient, arn string) ([]string, error) {
 	return brokers, nil
 }
 
-// BuildClusterDetails extracts the relevant details from a ClusterInfo and returns a ClusterDetails
-func BuildClusterDetails(svc kafkaClient, c types.ClusterInfo) (clusterDetails, error) {
-	brokers, err := GetBrokers(svc, *c.ClusterArn)
+// buildClusterDetails extracts the relevant details from a ClusterInfo and returns a ClusterDetails
+func buildClusterDetails(svc kafkaClient, c types.ClusterInfo) (clusterDetails, error) {
+	brokers, err := getBrokers(svc, *c.ClusterArn)
 	if err != nil {
 		fmt.Println(err)
 		return clusterDetails{}, err
@@ -120,15 +120,16 @@ func BuildClusterDetails(svc kafkaClient, c types.ClusterInfo) (clusterDetails, 
 	return cluster, nil
 }
 
+// GetStaticConfigs pulls a list of MSK clusters and brokers and returns a slice of PrometheusStaticConfigs
 func GetStaticConfigs(svc kafkaClient) ([]PrometheusStaticConfig, error) {
-	clusters, err := GetClusters(svc)
+	clusters, err := getClusters(svc)
 	if err != nil {
 		return []PrometheusStaticConfig{}, err
 	}
 	staticConfigs := []PrometheusStaticConfig{}
 
 	for _, cluster := range clusters.ClusterInfoList {
-		clusterDetails, err := BuildClusterDetails(svc, cluster)
+		clusterDetails, err := buildClusterDetails(svc, cluster)
 		if err != nil {
 			return []PrometheusStaticConfig{}, err
 		}

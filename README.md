@@ -1,4 +1,6 @@
 [![statsbomb/prometheus-msk-discovery](https://img.shields.io/docker/pulls/statsbomb/prometheus-msk-discovery.svg)](https://hub.docker.com/r/statsbomb/prometheus-msk-discovery)
+[![Test](https://github.com/statsbomb/prometheus-msk-discovery/actions/workflows/test.yaml/badge.svg)](https://github.com/statsbomb/prometheus-msk-discovery/actions/workflows/release.yaml)
+[![Go Report Card](https://goreportcard.com/badge/github.com/statsbomb/prometheus-msk-discovery)](https://goreportcard.com/report/github.com/statsbomb/prometheus-msk-discovery)
 
 # prometheus-msk-discovery
 
