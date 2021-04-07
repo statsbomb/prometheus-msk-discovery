@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"sort"
 	"strings"
 	"testing"
 
@@ -22,9 +23,15 @@ type mockKafkaClient struct{ clusters map[string]mockCluster }
 
 func (m mockKafkaClient) ListClusters(ctx context.Context, params *kafka.ListClustersInput, optFns ...func(*kafka.Options)) (*kafka.ListClustersOutput, error) {
 	var clusterInfoList []types.ClusterInfo
-	for arn, cluster := range m.clusters {
-		cArn := arn
-		cCluster := cluster
+	keys := make([]string, 0)
+	for k, _ := range m.clusters {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	for _, k := range keys {
+		cArn := k
+		cCluster := m.clusters[k]
 		clusterInfoList = append(clusterInfoList, types.ClusterInfo{
 			ClusterArn:  &cArn,
 			ClusterName: &cCluster.clusterName,
