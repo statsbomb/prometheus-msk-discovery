@@ -1,0 +1,23 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Build
+        run: |
+          go build -o prometheus-msk-discovery-linux-amd64
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: "prometheus-msk-discovery-linux-amd64"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

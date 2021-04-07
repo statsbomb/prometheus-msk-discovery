@@ -40,8 +40,8 @@ type PrometheusStaticConfig struct {
 	Labels  labels   `yaml:"labels"`
 }
 
-// ClusterDetails holds details of cluster, each broker, and which OpenMetrics endpoints are enabled
-type ClusterDetails struct {
+// clusterDetails holds details of cluster, each broker, and which OpenMetrics endpoints are enabled
+type clusterDetails struct {
 	ClusterName  string
 	ClusterArn   string
 	Brokers      []string
@@ -50,7 +50,7 @@ type ClusterDetails struct {
 }
 
 // (ClusterDetails).StaticConfig generates a PrometheusStaticConfig based on the cluster's details
-func (c ClusterDetails) StaticConfig() PrometheusStaticConfig {
+func (c clusterDetails) StaticConfig() PrometheusStaticConfig {
 	ret := PrometheusStaticConfig{}
 	ret.Labels = labels{
 		Job:         strings.Join([]string{*jobPrefix, c.ClusterName}, "-"),
@@ -103,14 +103,14 @@ func GetBrokers(svc kafkaClient, arn string) ([]string, error) {
 }
 
 // BuildClusterDetails extracts the relevant details from a ClusterInfo and returns a ClusterDetails
-func BuildClusterDetails(svc kafkaClient, c types.ClusterInfo) (ClusterDetails, error) {
+func BuildClusterDetails(svc kafkaClient, c types.ClusterInfo) (clusterDetails, error) {
 	brokers, err := GetBrokers(svc, *c.ClusterArn)
 	if err != nil {
 		fmt.Println(err)
-		return ClusterDetails{}, err
+		return clusterDetails{}, err
 	}
 
-	cluster := ClusterDetails{
+	cluster := clusterDetails{
 		ClusterName:  *c.ClusterName,
 		ClusterArn:   *c.ClusterArn,
 		Brokers:      brokers,
@@ -120,34 +120,29 @@ func BuildClusterDetails(svc kafkaClient, c types.ClusterInfo) (ClusterDetails, 
 	return cluster, nil
 }
 
+func GetStaticConfigs(svc kafkaClient) []PrometheusStaticConfig {
+	clusters, _ := GetClusters(svc)
+	staticConfigs := []PrometheusStaticConfig{}
+
+	for _, cluster := range clusters.ClusterInfoList {
+		clusterDetails, _ := BuildClusterDetails(svc, cluster)
+		if !clusterDetails.JmxExporter && !clusterDetails.NodeExporter {
+			continue
+		}
+		staticConfigs = append(staticConfigs, clusterDetails.StaticConfig())
+	}
+	return staticConfigs
+}
+
 func main() {
 	flag.Parse()
 
 	cfg, _ := config.LoadDefaultConfig(context.TODO())
 	client := kafka.NewFromConfig(cfg)
+
 	work := func() {
-		result, err := GetClusters(client)
-		if err != nil {
-			fmt.Println(err)
-			return
-		}
 
-		var clusters []ClusterDetails
-		for _, r := range result.ClusterInfoList {
-			c, err := BuildClusterDetails(client, r)
-			if err != nil {
-				fmt.Println(err)
-				return
-			}
-			clusters = append(clusters, c)
-		}
-
-		var staticConfigs []PrometheusStaticConfig
-		for _, c := range clusters {
-			info := c.StaticConfig()
-			staticConfigs = append(staticConfigs, info)
-		}
-
+		staticConfigs := GetStaticConfigs(client)
 		m, err := yaml.Marshal(staticConfigs)
 		if err != nil {
 			fmt.Println(err)
