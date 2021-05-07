@@ -90,16 +90,20 @@ func getClusters(svc kafkaClient) (*kafka.ListClustersOutput, error) {
 // getBrokers returns a slice of broker hosts without ports
 func getBrokers(svc kafkaClient, arn string) ([]string, error) {
 	input := kafka.ListNodesInput{ClusterArn: &arn}
-	r, err := svc.ListNodes(context.Background(), &input)
-
-	if err != nil {
-		return nil, err
-	}
-
 	var brokers []string
-	for _, b := range r.NodeInfoList {
-		brokers = append(brokers, b.BrokerNodeInfo.Endpoints...)
+
+	p := kafka.NewListNodesPaginator(svc, &input)
+	for p.HasMorePages() {
+		page, err := p.NextPage(context.Background())
+		if err != nil {
+			return nil, err
+		}
+
+		for _, b := range page.NodeInfoList {
+			brokers = append(brokers, b.BrokerNodeInfo.Endpoints...)
+		}
 	}
+
 	return brokers, nil
 }
 
