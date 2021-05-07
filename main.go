@@ -24,7 +24,7 @@ var jobPrefix = flag.String("job-prefix", "msk", "string with which to prefix ea
 
 type kafkaClient interface {
 	ListClusters(ctx context.Context, params *kafka.ListClustersInput, optFns ...func(*kafka.Options)) (*kafka.ListClustersOutput, error)
-	GetBootstrapBrokers(ctx context.Context, params *kafka.GetBootstrapBrokersInput, optFns ...func(*kafka.Options)) (*kafka.GetBootstrapBrokersOutput, error)
+	ListNodes(ctx context.Context, params *kafka.ListNodesInput, optFns ...func(*kafka.Options)) (*kafka.ListNodesOutput, error)
 }
 
 type labels struct {
@@ -89,15 +89,16 @@ func getClusters(svc kafkaClient) (*kafka.ListClustersOutput, error) {
 
 // getBrokers returns a slice of broker hosts without ports
 func getBrokers(svc kafkaClient, arn string) ([]string, error) {
-	input := &kafka.GetBootstrapBrokersInput{ClusterArn: &arn}
-	r, err := svc.GetBootstrapBrokers(context.Background(), input)
+	input := kafka.ListNodesInput{ClusterArn: &arn}
+	r, err := svc.ListNodes(context.Background(), &input)
+
 	if err != nil {
 		return nil, err
 	}
 
 	var brokers []string
-	for _, b := range strings.Split(*r.BootstrapBrokerString, ",") {
-		brokers = append(brokers, strings.Split(b, ":")[0])
+	for _, b := range r.NodeInfoList {
+		brokers = append(brokers, b.BrokerNodeInfo.Endpoints...)
 	}
 	return brokers, nil
 }
