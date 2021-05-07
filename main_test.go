@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"reflect"
 	"sort"
-	"strings"
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/service/kafka"
@@ -53,20 +52,22 @@ func (m mockKafkaClient) ListClusters(ctx context.Context, params *kafka.ListClu
 	return &output, nil
 }
 
-func (m mockKafkaClient) GetBootstrapBrokers(ctx context.Context, params *kafka.GetBootstrapBrokersInput, optFns ...func(*kafka.Options)) (*kafka.GetBootstrapBrokersOutput, error) {
+func (m mockKafkaClient) ListNodes(ctx context.Context, params *kafka.ListNodesInput, optFns ...func(*kafka.Options)) (*kafka.ListNodesOutput, error) {
 	cluster := m.clusters[*params.ClusterArn]
-	var brokers []string
+	var nodeInfos []types.NodeInfo
 
 	for i := 1; i <= cluster.brokerCount; {
-		brokers = append(brokers, fmt.Sprintf("b-%v.broker.com:9002", i))
+		n := types.NodeInfo{
+			NodeType:       "BROKER",
+			BrokerNodeInfo: &types.BrokerNodeInfo{Endpoints: []string{fmt.Sprintf("b-%v.broker.com", i)}},
+		}
+		nodeInfos = append(nodeInfos, n)
 		i++
 	}
-
-	brokerString := strings.Join(brokers, ",")
-	output := kafka.GetBootstrapBrokersOutput{
-		BootstrapBrokerString: &brokerString,
+	out := kafka.ListNodesOutput{
+		NodeInfoList: nodeInfos,
 	}
-	return &output, nil
+	return &out, nil
 }
 
 func TestGetStaticConfigs(t *testing.T) {
