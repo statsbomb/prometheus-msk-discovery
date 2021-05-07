@@ -24,7 +24,7 @@ When using AWS credentials or IAM Roles, the following policy needs to be attach
             "Effect": "Allow",
             "Action": [
                 "kafka:ListClusters",
-                "kafka:GetBootstrapBrokers
+                "kafka:ListNodes"
             ],
             "Resource": [
                 "*"
