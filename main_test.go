@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"regexp"
 	"sort"
 	"testing"
 
@@ -159,4 +160,76 @@ func TestGetStaticConfigs(t *testing.T) {
 		}
 	})
 
+}
+
+func strPtr(str string) *string {
+	return &str
+}
+
+func Test_filterClusters(t *testing.T) {
+	type args struct {
+		clusters kafka.ListClustersOutput
+		filter   regexp.Regexp
+	}
+
+	defaultFilter, _ := regexp.Compile(``)
+	testClusterFilter, _ := regexp.Compile(`test`)
+
+	tests := []struct {
+		name string
+		args args
+		want *kafka.ListClustersOutput
+	}{
+		{
+			name: "empty-filter",
+			args: args{
+				clusters: kafka.ListClustersOutput{
+					ClusterInfoList: []types.ClusterInfo{
+						{
+							ClusterName: strPtr("test-cluster"),
+						},
+					},
+				},
+				filter: *defaultFilter,
+			},
+			want: &kafka.ListClustersOutput{
+				ClusterInfoList: []types.ClusterInfo{
+					{
+						ClusterName: strPtr("test-cluster"),
+					},
+				},
+			},
+		},
+		{
+			name: "test-cluster-filter",
+			args: args{
+				clusters: kafka.ListClustersOutput{
+					ClusterInfoList: []types.ClusterInfo{
+						{
+							ClusterName: strPtr("test-cluster"),
+						},
+						{
+							ClusterName: strPtr("filtered-cluster"),
+						},
+					},
+				},
+				filter: *testClusterFilter,
+			},
+			want: &kafka.ListClustersOutput{
+				ClusterInfoList: []types.ClusterInfo{
+					{
+						ClusterName: strPtr("test-cluster"),
+					},
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := filterClusters(tt.args.clusters, tt.args.filter); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("filterClusters() = %v, want %v", got, tt.want)
+			}
+		})
+	}
 }

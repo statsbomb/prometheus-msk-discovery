@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"regexp"
 	"strings"
 	"time"
 
@@ -21,6 +22,7 @@ const nodeExporterPort = 11002
 var outFile = flag.String("output", "msk_file_sd.yml", "path of the file to write MSK discovery information to")
 var interval = flag.Duration("scrape-interval", 5*time.Minute, "interval at which to scrape the AWS API for MSK cluster information")
 var jobPrefix = flag.String("job-prefix", "msk", "string with which to prefix each job label")
+var clusterFilter = flag.String("filter", "", "a regex pattern to filter cluster names from the results")
 
 type kafkaClient interface {
 	ListClusters(ctx context.Context, params *kafka.ListClustersInput, optFns ...func(*kafka.Options)) (*kafka.ListClustersOutput, error)
@@ -125,13 +127,32 @@ func buildClusterDetails(svc kafkaClient, c types.ClusterInfo) (clusterDetails, 
 	return cluster, nil
 }
 
+func filterClusters(clusters kafka.ListClustersOutput, filter regexp.Regexp) *kafka.ListClustersOutput {
+	var filteredClusters []types.ClusterInfo
+
+	for _, cluster := range clusters.ClusterInfoList {
+		if filter.MatchString(*cluster.ClusterName) {
+			filteredClusters = append(filteredClusters, cluster)
+		}
+	}
+
+	return &kafka.ListClustersOutput{ClusterInfoList: filteredClusters}
+}
+
 // GetStaticConfigs pulls a list of MSK clusters and brokers and returns a slice of PrometheusStaticConfigs
-func GetStaticConfigs(svc kafkaClient) ([]PrometheusStaticConfig, error) {
+func GetStaticConfigs(svc kafkaClient, opt_filter ...regexp.Regexp) ([]PrometheusStaticConfig, error) {
+	filter, _ := regexp.Compile(``)
+	if len(opt_filter) > 0 {
+		filter = &opt_filter[0]
+	}
+
 	clusters, err := getClusters(svc)
 	if err != nil {
 		return []PrometheusStaticConfig{}, err
 	}
 	staticConfigs := []PrometheusStaticConfig{}
+
+	clusters = filterClusters(*clusters, *filter)
 
 	for _, cluster := range clusters.ClusterInfoList {
 		clusterDetails, err := buildClusterDetails(svc, cluster)
@@ -160,7 +181,13 @@ func main() {
 
 	work := func() {
 
-		staticConfigs, err := GetStaticConfigs(client)
+		regexpFilter, err := regexp.Compile(*clusterFilter)
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+
+		staticConfigs, err := GetStaticConfigs(client, *regexpFilter)
 		if err != nil {
 			fmt.Println(err)
 			return
