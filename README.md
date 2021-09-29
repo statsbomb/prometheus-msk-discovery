@@ -42,6 +42,8 @@ When using AWS credentials or IAM Roles, the following policy needs to be attach
 
 ```
 Usage of ./prometheus-msk-discovery:
+  -filter string
+    	a regex pattern to filter cluster names from the results
   -job-prefix string
     	string with which to prefix each job label (default "msk")
   -output string
@@ -53,7 +55,7 @@ Usage of ./prometheus-msk-discovery:
 ### Example output:
 
 ```
-$ ./prometheus-msk-discovery -scrape-interval 10s
+$ ./prometheus-msk-discovery -scrape-interval 10s -filter 'primary'
 2021/04/04 21:02:55 Writing 1 discovered exporters to msk_file_sd.yml
 ```
 
