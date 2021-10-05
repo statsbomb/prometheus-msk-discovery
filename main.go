@@ -171,7 +171,7 @@ func GetStaticConfigs(svc kafkaClient, opt_filter ...regexp.Regexp) ([]Prometheu
 func main() {
 	flag.Parse()
 
-	cfg, err := config.LoadDefaultConfig(context.TODO())
+	cfg, err := config.LoadDefaultConfig(context.TODO(), config.WithEC2IMDSRegion())
 	if err != nil {
 		fmt.Println(err)
 		return
