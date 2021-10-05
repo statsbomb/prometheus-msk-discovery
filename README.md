@@ -89,6 +89,9 @@ You'll then need to add something similar to the following to your additionalScr
   honor_labels: true
 ```
 
+### Other Kubernetes Setups
+If you're not using the kube-prometheus-stack Helm chart then the general idea for running prometheus-msk-discovery is that it needs to be run as a [sidecar container](https://kubernetes.io/docs/concepts/workloads/pods/#how-pods-manage-multiple-containers) alongside the container that is running Prometheus. You'll need to ensure that there is a [shared volume](https://kubernetes.io/docs/tasks/access-application-cluster/communicate-containers-same-pod-shared-volume/) mounted to both of the containers in order for Prometheus to be able to read the config file that prometheus-msk-discovery writes.
+
 ## Building
 
 Building can be done just by using `go build`
