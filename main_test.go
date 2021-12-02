@@ -183,6 +183,7 @@ func Test_filterClusters(t *testing.T) {
 		NameFilter: *(regexp.MustCompile(``)),
 		TagFilter: map[string]string{
 			"Enviroment": "test",
+			"SomeOther": "tag",
 		},
 	}
 
@@ -243,6 +244,14 @@ func Test_filterClusters(t *testing.T) {
 							ClusterName: strPtr("test-cluster"),
 							Tags: map[string]string{
 								"Enviroment": "test",
+								"SomeOther": "DifferentTag",
+							},
+						},
+						{
+							ClusterName: strPtr("second-test-cluster"),
+							Tags: map[string]string{
+								"Enviroment": "staging",
+								"SomeOther": "tag",
 							},
 						},
 						{
@@ -258,6 +267,14 @@ func Test_filterClusters(t *testing.T) {
 						ClusterName: strPtr("test-cluster"),
 						Tags:  map[string]string{
 							"Enviroment": "test",
+							"SomeOther": "DifferentTag",
+						},
+					},
+					{
+						ClusterName: strPtr("second-test-cluster"),
+						Tags: map[string]string{
+							"Enviroment": "staging",
+							"SomeOther": "tag",
 						},
 					},
 				},
