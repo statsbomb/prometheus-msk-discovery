@@ -29,7 +29,6 @@ var (
 	jobPrefix     	= flag.String("job-prefix", "msk", "string with which to prefix each job label")
 	clusterFilter	= flag.String("filter", "", "a regex pattern to filter cluster names from the results")
 	awsRegion     	= flag.String("region", "", "the aws region in which to scan for MSK clusters")
-	tagFilters tags = make(tags)
 )
 
 type kafkaClient interface {
@@ -160,6 +159,7 @@ func filterClusters(clusters kafka.ListClustersOutput, filter Filter) *kafka.Lis
 		for tagKey, tagValue := range filter.TagFilter {
 			if cluster.Tags[tagKey] == tagValue {
 				tagMatch = true
+				break
 			}
 		}
 		if filter.NameFilter.MatchString(*cluster.ClusterName) && tagMatch {
@@ -195,6 +195,7 @@ func GetStaticConfigs(svc kafkaClient, filter Filter) ([]PrometheusStaticConfig,
 }
 
 func main() {
+	var tagFilters tags = make(tags)
 	flag.Var(&tagFilters, "tag", "A key=value for filtering by tags. Flag can be specified multiple times, resulting OR expression.")
 	flag.Parse()
 
