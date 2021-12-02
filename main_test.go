@@ -227,7 +227,10 @@ func Test_filterClusters(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := filterClusters(tt.args.clusters, tt.args.filter); !reflect.DeepEqual(got, tt.want) {
+			filter := Filter{
+				NameFilter: tt.args.filter,
+			}
+			if got := filterClusters(tt.args.clusters, filter); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("filterClusters() = %v, want %v", got, tt.want)
 			}
 		})

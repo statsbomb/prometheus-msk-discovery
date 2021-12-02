@@ -171,12 +171,21 @@ func filterClusters(clusters kafka.ListClustersOutput, filter Filter) *kafka.Lis
 }
 
 // GetStaticConfigs pulls a list of MSK clusters and brokers and returns a slice of PrometheusStaticConfigs
-func GetStaticConfigs(svc kafkaClient, filter Filter) ([]PrometheusStaticConfig, error) {
+func GetStaticConfigs(svc kafkaClient, opt_filter ...Filter) ([]PrometheusStaticConfig, error) {
 	clusters, err := getClusters(svc)
 	if err != nil {
 		return []PrometheusStaticConfig{}, err
 	}
 	staticConfigs := []PrometheusStaticConfig{}
+
+	// Assign a default Filter, if none is passed.
+	defaultNameRegex, _ := regexp.Compile(``)
+	filter := Filter{
+		NameFilter: *defaultNameRegex,
+	}
+	if len(opt_filter) > 0 {
+		filter = opt_filter[0]
+	}
 
 	clusters = filterClusters(*clusters, filter)
 
