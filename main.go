@@ -21,12 +21,15 @@ const (
 	nodeExporterPort = 11002
 )
 
+type tags map[string]string
+
 var (
-	outFile       = flag.String("output", "msk_file_sd.yml", "path of the file to write MSK discovery information to")
-	interval      = flag.Duration("scrape-interval", 5*time.Minute, "interval at which to scrape the AWS API for MSK cluster information")
-	jobPrefix     = flag.String("job-prefix", "msk", "string with which to prefix each job label")
-	clusterFilter = flag.String("filter", "", "a regex pattern to filter cluster names from the results")
-	awsRegion     = flag.String("region", "", "the aws region in which to scan for MSK clusters")
+	outFile       	= flag.String("output", "msk_file_sd.yml", "path of the file to write MSK discovery information to")
+	interval      	= flag.Duration("scrape-interval", 5*time.Minute, "interval at which to scrape the AWS API for MSK cluster information")
+	jobPrefix     	= flag.String("job-prefix", "msk", "string with which to prefix each job label")
+	clusterFilter	= flag.String("filter", "", "a regex pattern to filter cluster names from the results")
+	awsRegion     	= flag.String("region", "", "the aws region in which to scan for MSK clusters")
+	tagFilters tags = make(tags)
 )
 
 type kafkaClient interface {
@@ -54,6 +57,16 @@ type clusterDetails struct {
 	Brokers      []string
 	JmxExporter  bool
 	NodeExporter bool
+}
+
+func (i *tags) String() string {
+	return "my string representation"
+}
+func (i *tags) Set(value string) error {
+	split := strings.Split(value, "=")
+
+	(*i)[split[0]] = split[1]
+	return nil
 }
 
 // (ClusterDetails).StaticConfig generates a PrometheusStaticConfig based on the cluster's details
@@ -134,9 +147,17 @@ func buildClusterDetails(svc kafkaClient, c types.ClusterInfo) (clusterDetails, 
 
 func filterClusters(clusters kafka.ListClustersOutput, filter regexp.Regexp) *kafka.ListClustersOutput {
 	var filteredClusters []types.ClusterInfo
-
+	var tagMatch bool
+	if len(tagFilters) == 0 {
+		tagMatch = true
+	}
 	for _, cluster := range clusters.ClusterInfoList {
-		if filter.MatchString(*cluster.ClusterName) {
+		for tagKey, tagValue := range tagFilters {
+			if cluster.Tags[tagKey] == tagValue {
+				tagMatch = true
+			}
+		}
+		if filter.MatchString(*cluster.ClusterName) && tagMatch {
 			filteredClusters = append(filteredClusters, cluster)
 		}
 	}
@@ -174,6 +195,7 @@ func GetStaticConfigs(svc kafkaClient, opt_filter ...regexp.Regexp) ([]Prometheu
 }
 
 func main() {
+	flag.Var(&tagFilters, "tags", "A key=value for filtering by tags. Flag can be specified multiple times.")
 	flag.Parse()
 
 	cfg, err := config.LoadDefaultConfig(context.TODO(), config.WithRegion(*awsRegion), config.WithEC2IMDSRegion())
