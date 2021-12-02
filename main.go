@@ -152,10 +152,12 @@ func buildClusterDetails(svc kafkaClient, c types.ClusterInfo) (clusterDetails, 
 func filterClusters(clusters kafka.ListClustersOutput, filter Filter) *kafka.ListClustersOutput {
 	var filteredClusters []types.ClusterInfo
 	var tagMatch bool
-	if len(filter.TagFilter) == 0 {
-		tagMatch = true
-	}
 	for _, cluster := range clusters.ClusterInfoList {
+		if len(filter.TagFilter) == 0 {
+			tagMatch = true
+		} else {
+			tagMatch = false
+		}
 		for tagKey, tagValue := range filter.TagFilter {
 			if cluster.Tags[tagKey] == tagValue {
 				tagMatch = true

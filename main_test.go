@@ -169,11 +169,22 @@ func strPtr(str string) *string {
 func Test_filterClusters(t *testing.T) {
 	type args struct {
 		clusters kafka.ListClustersOutput
-		filter   regexp.Regexp
+		filter   Filter
+	}
+	defaultFilter := Filter{
+		NameFilter: *(regexp.MustCompile(``)),
 	}
 
-	defaultFilter, _ := regexp.Compile(``)
-	testClusterFilter, _ := regexp.Compile(`test`)
+	testClusterFilter := Filter{
+		NameFilter: *(regexp.MustCompile(`test`)),
+	}
+
+	tagFilter := Filter{
+		NameFilter: *(regexp.MustCompile(``)),
+		TagFilter: map[string]string{
+			"Enviroment": "test",
+		},
+	}
 
 	tests := []struct {
 		name string
@@ -190,7 +201,7 @@ func Test_filterClusters(t *testing.T) {
 						},
 					},
 				},
-				filter: *defaultFilter,
+				filter: defaultFilter,
 			},
 			want: &kafka.ListClustersOutput{
 				ClusterInfoList: []types.ClusterInfo{
@@ -213,7 +224,7 @@ func Test_filterClusters(t *testing.T) {
 						},
 					},
 				},
-				filter: *testClusterFilter,
+				filter: testClusterFilter,
 			},
 			want: &kafka.ListClustersOutput{
 				ClusterInfoList: []types.ClusterInfo{
@@ -223,14 +234,40 @@ func Test_filterClusters(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "test-tag-filter",
+			args: args{
+				clusters: kafka.ListClustersOutput{
+					ClusterInfoList: []types.ClusterInfo{
+						{
+							ClusterName: strPtr("test-cluster"),
+							Tags: map[string]string{
+								"Enviroment": "test",
+							},
+						},
+						{
+							ClusterName: strPtr("filtered-cluster"),
+						},
+					},
+				},
+				filter: tagFilter,
+			},
+			want: &kafka.ListClustersOutput{
+				ClusterInfoList: []types.ClusterInfo{
+					{
+						ClusterName: strPtr("test-cluster"),
+						Tags:  map[string]string{
+							"Enviroment": "test",
+						},
+					},
+				},
+			},
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			filter := Filter{
-				NameFilter: tt.args.filter,
-			}
-			if got := filterClusters(tt.args.clusters, filter); !reflect.DeepEqual(got, tt.want) {
+			if got := filterClusters(tt.args.clusters, tt.args.filter); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("filterClusters() = %v, want %v", got, tt.want)
 			}
 		})
