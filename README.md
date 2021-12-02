@@ -61,6 +61,11 @@ $ ./prometheus-msk-discovery -scrape-interval 10s -filter 'primary'
 
 An example output file can be found [here](examples/msk_file_sd.yml)
 
+## Region Precedence
+When no region is specified with the `-region` flag the process first attempts to load the default SDK configuration checking for an `AWS_REGION` environment variable or reading any region specified in the standard [configuration file](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html). If no region is found it will attempt to retrieve it from the EC2 Instance Metadata Service.
+
+**Explicitly setting a region with the** `-region` **flag takes precedence over everything else.**
+
 ## Integration with kube-prometheus-stack
 
 The [Docker image](https://hub.docker.com/r/statsbomb/prometheus-msk-discovery) for this project can be used to inject a container into the Prometheus Spec of a [kube-prometheus-stack](https://github.com/prometheus-community/helm-charts/tree/main/charts/kube-prometheus-stack) installation by using the following snippet in `values.yaml`:

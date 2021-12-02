@@ -16,13 +16,18 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-const jmxExporterPort = 11001
-const nodeExporterPort = 11002
+const (
+	jmxExporterPort  = 11001
+	nodeExporterPort = 11002
+)
 
-var outFile = flag.String("output", "msk_file_sd.yml", "path of the file to write MSK discovery information to")
-var interval = flag.Duration("scrape-interval", 5*time.Minute, "interval at which to scrape the AWS API for MSK cluster information")
-var jobPrefix = flag.String("job-prefix", "msk", "string with which to prefix each job label")
-var clusterFilter = flag.String("filter", "", "a regex pattern to filter cluster names from the results")
+var (
+	outFile       = flag.String("output", "msk_file_sd.yml", "path of the file to write MSK discovery information to")
+	interval      = flag.Duration("scrape-interval", 5*time.Minute, "interval at which to scrape the AWS API for MSK cluster information")
+	jobPrefix     = flag.String("job-prefix", "msk", "string with which to prefix each job label")
+	clusterFilter = flag.String("filter", "", "a regex pattern to filter cluster names from the results")
+	awsRegion     = flag.String("region", "", "the aws region in which to scan for MSK clusters")
+)
 
 type kafkaClient interface {
 	ListClusters(ctx context.Context, params *kafka.ListClustersInput, optFns ...func(*kafka.Options)) (*kafka.ListClustersOutput, error)
@@ -171,7 +176,7 @@ func GetStaticConfigs(svc kafkaClient, opt_filter ...regexp.Regexp) ([]Prometheu
 func main() {
 	flag.Parse()
 
-	cfg, err := config.LoadDefaultConfig(context.TODO(), config.WithEC2IMDSRegion())
+	cfg, err := config.LoadDefaultConfig(context.TODO(), config.WithRegion(*awsRegion), config.WithEC2IMDSRegion())
 	if err != nil {
 		fmt.Println(err)
 		return
@@ -180,7 +185,6 @@ func main() {
 	client := kafka.NewFromConfig(cfg)
 
 	work := func() {
-
 		regexpFilter, err := regexp.Compile(*clusterFilter)
 		if err != nil {
 			fmt.Println(err)
@@ -216,5 +220,4 @@ func main() {
 		}
 		work()
 	}
-
 }
