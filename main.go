@@ -59,8 +59,13 @@ type clusterDetails struct {
 	NodeExporter bool
 }
 
+type Filter struct {
+	NameFilter regexp.Regexp
+	TagFilter  tags
+}
+
 func (i *tags) String() string {
-	return "my string representation"
+	return fmt.Sprint(*i)
 }
 func (i *tags) Set(value string) error {
 	split := strings.Split(value, "=")
@@ -145,19 +150,19 @@ func buildClusterDetails(svc kafkaClient, c types.ClusterInfo) (clusterDetails, 
 	return cluster, nil
 }
 
-func filterClusters(clusters kafka.ListClustersOutput, filter regexp.Regexp) *kafka.ListClustersOutput {
+func filterClusters(clusters kafka.ListClustersOutput, filter Filter) *kafka.ListClustersOutput {
 	var filteredClusters []types.ClusterInfo
 	var tagMatch bool
-	if len(tagFilters) == 0 {
+	if len(filter.TagFilter) == 0 {
 		tagMatch = true
 	}
 	for _, cluster := range clusters.ClusterInfoList {
-		for tagKey, tagValue := range tagFilters {
+		for tagKey, tagValue := range filter.TagFilter {
 			if cluster.Tags[tagKey] == tagValue {
 				tagMatch = true
 			}
 		}
-		if filter.MatchString(*cluster.ClusterName) && tagMatch {
+		if filter.NameFilter.MatchString(*cluster.ClusterName) && tagMatch {
 			filteredClusters = append(filteredClusters, cluster)
 		}
 	}
@@ -166,19 +171,14 @@ func filterClusters(clusters kafka.ListClustersOutput, filter regexp.Regexp) *ka
 }
 
 // GetStaticConfigs pulls a list of MSK clusters and brokers and returns a slice of PrometheusStaticConfigs
-func GetStaticConfigs(svc kafkaClient, opt_filter ...regexp.Regexp) ([]PrometheusStaticConfig, error) {
-	filter, _ := regexp.Compile(``)
-	if len(opt_filter) > 0 {
-		filter = &opt_filter[0]
-	}
-
+func GetStaticConfigs(svc kafkaClient, filter Filter) ([]PrometheusStaticConfig, error) {
 	clusters, err := getClusters(svc)
 	if err != nil {
 		return []PrometheusStaticConfig{}, err
 	}
 	staticConfigs := []PrometheusStaticConfig{}
 
-	clusters = filterClusters(*clusters, *filter)
+	clusters = filterClusters(*clusters, filter)
 
 	for _, cluster := range clusters.ClusterInfoList {
 		clusterDetails, err := buildClusterDetails(svc, cluster)
@@ -195,7 +195,7 @@ func GetStaticConfigs(svc kafkaClient, opt_filter ...regexp.Regexp) ([]Prometheu
 }
 
 func main() {
-	flag.Var(&tagFilters, "tags", "A key=value for filtering by tags. Flag can be specified multiple times.")
+	flag.Var(&tagFilters, "tag", "A key=value for filtering by tags. Flag can be specified multiple times, resulting OR expression.")
 	flag.Parse()
 
 	cfg, err := config.LoadDefaultConfig(context.TODO(), config.WithRegion(*awsRegion), config.WithEC2IMDSRegion())
@@ -213,7 +213,12 @@ func main() {
 			return
 		}
 
-		staticConfigs, err := GetStaticConfigs(client, *regexpFilter)
+		filter := Filter{
+			NameFilter: *regexpFilter,
+			TagFilter: tagFilters,
+		}
+
+		staticConfigs, err := GetStaticConfigs(client, filter)
 		if err != nil {
 			fmt.Println(err)
 			return
