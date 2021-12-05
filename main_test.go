@@ -169,11 +169,23 @@ func strPtr(str string) *string {
 func Test_filterClusters(t *testing.T) {
 	type args struct {
 		clusters kafka.ListClustersOutput
-		filter   regexp.Regexp
+		filter   Filter
+	}
+	defaultFilter := Filter{
+		NameFilter: *(regexp.MustCompile(``)),
 	}
 
-	defaultFilter, _ := regexp.Compile(``)
-	testClusterFilter, _ := regexp.Compile(`test`)
+	testClusterFilter := Filter{
+		NameFilter: *(regexp.MustCompile(`test`)),
+	}
+
+	tagFilter := Filter{
+		NameFilter: *(regexp.MustCompile(``)),
+		TagFilter: map[string]string{
+			"Enviroment": "test",
+			"SomeOther": "tag",
+		},
+	}
 
 	tests := []struct {
 		name string
@@ -190,7 +202,7 @@ func Test_filterClusters(t *testing.T) {
 						},
 					},
 				},
-				filter: *defaultFilter,
+				filter: defaultFilter,
 			},
 			want: &kafka.ListClustersOutput{
 				ClusterInfoList: []types.ClusterInfo{
@@ -213,12 +225,57 @@ func Test_filterClusters(t *testing.T) {
 						},
 					},
 				},
-				filter: *testClusterFilter,
+				filter: testClusterFilter,
 			},
 			want: &kafka.ListClustersOutput{
 				ClusterInfoList: []types.ClusterInfo{
 					{
 						ClusterName: strPtr("test-cluster"),
+					},
+				},
+			},
+		},
+		{
+			name: "test-tag-filter",
+			args: args{
+				clusters: kafka.ListClustersOutput{
+					ClusterInfoList: []types.ClusterInfo{
+						{
+							ClusterName: strPtr("test-cluster"),
+							Tags: map[string]string{
+								"Enviroment": "test",
+								"SomeOther": "DifferentTag",
+							},
+						},
+						{
+							ClusterName: strPtr("second-test-cluster"),
+							Tags: map[string]string{
+								"Enviroment": "staging",
+								"SomeOther": "tag",
+							},
+						},
+						{
+							ClusterName: strPtr("filtered-cluster"),
+						},
+					},
+				},
+				filter: tagFilter,
+			},
+			want: &kafka.ListClustersOutput{
+				ClusterInfoList: []types.ClusterInfo{
+					{
+						ClusterName: strPtr("test-cluster"),
+						Tags:  map[string]string{
+							"Enviroment": "test",
+							"SomeOther": "DifferentTag",
+						},
+					},
+					{
+						ClusterName: strPtr("second-test-cluster"),
+						Tags: map[string]string{
+							"Enviroment": "staging",
+							"SomeOther": "tag",
+						},
 					},
 				},
 			},
