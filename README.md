@@ -44,12 +44,20 @@ When using AWS credentials or IAM Roles, the following policy needs to be attach
 Usage of ./prometheus-msk-discovery:
   -filter string
     	a regex pattern to filter cluster names from the results
+  -http-sd
+    	expose http_sd interface rather than writing a file
   -job-prefix string
     	string with which to prefix each job label (default "msk")
+  -listen-address string
+    	Address to listen on for http service discovery (default ":8080")
   -output string
     	path of the file to write MSK discovery information to (default "msk_file_sd.yml")
+  -region string
+    	the aws region in which to scan for MSK clusters
   -scrape-interval duration
     	interval at which to scrape the AWS API for MSK cluster information (default 5m0s)
+  -tag value
+    	A key=value for filtering by tags. Flag can be specified multiple times, resulting OR expression.
 ```
 
 ### Example output:
@@ -60,6 +68,23 @@ $ ./prometheus-msk-discovery -scrape-interval 10s -filter 'primary'
 ```
 
 An example output file can be found [here](examples/msk_file_sd.yml)
+
+### http_sd
+
+```
+$ ./prometheus-msk-discovery -http-sd -listen-address :8989 -filter 'primary
+``
+
+```
+$ curl localhost:8989
+[{"targets":["b-1.primary-kafka.tffs8g.c2.kafka.eu-west-2.amazonaws.com:11001","b-1.primary-kafka.tffs8g.c2.kafka.eu-west-2.amazonaws.com:11002","b-2.primary-kafka.tffs8g.c2.kafka.eu-west-2.amazonaws.com:11001","b-2.primary-kafka.tffs8g.c2.kafka.eu-west-2.amazonaws.com:11002"],"labels":{"job":"msk-primary-kafka","cluster_name":"primary-kafka","cluster_arn":"arn:aws:kafka:eu-west-2:111111111111:cluster/primary-kafka/522d90ab-d400-4ea0-b8fd-bbf3576425d4-2"}}]
+```
+
+```yaml
+http_sd_configs:
+  - url: http://localhost:8989
+    refresh_interval: 30s
+```
 
 ## Region Precedence
 When no region is specified with the `-region` flag the process first attempts to load the default SDK configuration checking for an `AWS_REGION` environment variable or reading any region specified in the standard [configuration file](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html). If no region is found it will attempt to retrieve it from the EC2 Instance Metadata Service.

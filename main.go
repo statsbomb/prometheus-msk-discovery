@@ -2,10 +2,12 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"io/ioutil"
 	"log"
+	"net/http"
 	"regexp"
 	"strings"
 	"time"
@@ -29,6 +31,8 @@ var (
 	jobPrefix     = flag.String("job-prefix", "msk", "string with which to prefix each job label")
 	clusterFilter = flag.String("filter", "", "a regex pattern to filter cluster names from the results")
 	awsRegion     = flag.String("region", "", "the aws region in which to scan for MSK clusters")
+	httpSDEnabled = flag.Bool("http-sd", false, "expose http_sd interface rather than writing a file")
+	listenAddress = flag.String("listen-address", ":8080", "Address to listen on for http service discovery")
 )
 
 type kafkaClient interface {
@@ -37,16 +41,16 @@ type kafkaClient interface {
 }
 
 type labels struct {
-	Job         string `yaml:"job"`
-	ClusterName string `yaml:"cluster_name"`
-	ClusterArn  string `yaml:"cluster_arn"`
+	Job         string `yaml:"job" json:"job"`
+	ClusterName string `yaml:"cluster_name" json:"cluster_name"`
+	ClusterArn  string `yaml:"cluster_arn" json:"cluster_arn"`
 }
 
 // PrometheusStaticConfig is the final structure of a single static config that
-// will be outputted to the Prometheus file service discovery config
+// will be outputted to the Prometheus file/http service discovery config
 type PrometheusStaticConfig struct {
-	Targets []string `yaml:"targets"`
-	Labels  labels   `yaml:"labels"`
+	Targets []string `yaml:"targets" json:"targets"`
+	Labels  labels   `yaml:"labels" json:"labels"`
 }
 
 // clusterDetails holds details of cluster, each broker, and which OpenMetrics endpoints are enabled
@@ -239,6 +243,28 @@ func fileSD(client *kafka.Client, filter Filter) {
 	}
 }
 
+func httpSD(client *kafka.Client, filter Filter) {
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		staticConfigs, err := GetStaticConfigs(client, filter)
+		if err != nil {
+			log.Println(err)
+			http.Error(w, "Internal Server Error", 500)
+			return
+		}
+		m, err := json.Marshal(staticConfigs)
+		if err != nil {
+			log.Println(err)
+			http.Error(w, "Internal Server Error", 500)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.Write(m)
+		return
+	})
+
+	log.Fatal(http.ListenAndServe(*listenAddress, nil))
+}
+
 func main() {
 	var tagFilters tags = make(tags)
 	flag.Var(&tagFilters, "tag", "A key=value for filtering by tags. Flag can be specified multiple times, resulting OR expression.")
@@ -263,5 +289,9 @@ func main() {
 		TagFilter:  tagFilters,
 	}
 
-	fileSD(client, filter)
+	if *httpSDEnabled {
+		httpSD(client, filter)
+	} else {
+		fileSD(client, filter)
+	}
 }
