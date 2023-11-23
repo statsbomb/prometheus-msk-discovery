@@ -24,11 +24,11 @@ const (
 type tags map[string]string
 
 var (
-	outFile       	= flag.String("output", "msk_file_sd.yml", "path of the file to write MSK discovery information to")
-	interval      	= flag.Duration("scrape-interval", 5*time.Minute, "interval at which to scrape the AWS API for MSK cluster information")
-	jobPrefix     	= flag.String("job-prefix", "msk", "string with which to prefix each job label")
-	clusterFilter	= flag.String("filter", "", "a regex pattern to filter cluster names from the results")
-	awsRegion     	= flag.String("region", "", "the aws region in which to scan for MSK clusters")
+	outFile       = flag.String("output", "msk_file_sd.yml", "path of the file to write MSK discovery information to")
+	interval      = flag.Duration("scrape-interval", 5*time.Minute, "interval at which to scrape the AWS API for MSK cluster information")
+	jobPrefix     = flag.String("job-prefix", "msk", "string with which to prefix each job label")
+	clusterFilter = flag.String("filter", "", "a regex pattern to filter cluster names from the results")
+	awsRegion     = flag.String("region", "", "the aws region in which to scan for MSK clusters")
 )
 
 type kafkaClient interface {
@@ -205,30 +205,8 @@ func GetStaticConfigs(svc kafkaClient, opt_filter ...Filter) ([]PrometheusStatic
 	return staticConfigs, nil
 }
 
-func main() {
-	var tagFilters tags = make(tags)
-	flag.Var(&tagFilters, "tag", "A key=value for filtering by tags. Flag can be specified multiple times, resulting OR expression.")
-	flag.Parse()
-
-	cfg, err := config.LoadDefaultConfig(context.TODO(), config.WithRegion(*awsRegion), config.WithEC2IMDSRegion())
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-
-	client := kafka.NewFromConfig(cfg)
-
+func fileSD(client *kafka.Client, filter Filter) {
 	work := func() {
-		regexpFilter, err := regexp.Compile(*clusterFilter)
-		if err != nil {
-			fmt.Println(err)
-			return
-		}
-
-		filter := Filter{
-			NameFilter: *regexpFilter,
-			TagFilter: tagFilters,
-		}
 
 		staticConfigs, err := GetStaticConfigs(client, filter)
 		if err != nil {
@@ -259,4 +237,31 @@ func main() {
 		}
 		work()
 	}
+}
+
+func main() {
+	var tagFilters tags = make(tags)
+	flag.Var(&tagFilters, "tag", "A key=value for filtering by tags. Flag can be specified multiple times, resulting OR expression.")
+	flag.Parse()
+
+	cfg, err := config.LoadDefaultConfig(context.TODO(), config.WithRegion(*awsRegion), config.WithEC2IMDSRegion())
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	client := kafka.NewFromConfig(cfg)
+
+	regexpFilter, err := regexp.Compile(*clusterFilter)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	filter := Filter{
+		NameFilter: *regexpFilter,
+		TagFilter:  tagFilters,
+	}
+
+	fileSD(client, filter)
 }
