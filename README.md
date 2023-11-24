@@ -8,7 +8,7 @@ Service discovery for [AWS MSK](https://aws.amazon.com/msk/), compatible with [P
 
 ## How it works
 
-This service gets a list of MSK clusters in an AWS account and exports each broker to a Prometheus-compatible static config to be used with the [`file_sd_config`](https://prometheus.io/docs/prometheus/latest/configuration/configuration/#file_sd_config) mechanism.
+This service gets a list of MSK clusters in an AWS account and exports each broker to a Prometheus-compatible static config to be used with the [`file_sd_config`](https://prometheus.io/docs/prometheus/latest/configuration/configuration/#file_sd_config) or [`http_sd_config`](https://prometheus.io/docs/prometheus/latest/configuration/configuration/#http_sd_config) mechanism.
 
 ## Pre-requisites
 
