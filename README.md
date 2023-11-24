@@ -72,8 +72,8 @@ An example output file can be found [here](examples/msk_file_sd.yml)
 ### http_sd
 
 ```
-$ ./prometheus-msk-discovery -http-sd -listen-address :8989 -filter 'primary
-``
+$ ./prometheus-msk-discovery -http-sd -listen-address :8989 -filter 'primary'
+```
 
 ```
 $ curl localhost:8989
