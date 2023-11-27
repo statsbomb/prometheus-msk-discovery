@@ -55,7 +55,7 @@ Usage of ./prometheus-msk-discovery:
   -region string
     	the aws region in which to scan for MSK clusters
   -scrape-interval duration
-    	interval at which to scrape the AWS API for MSK cluster information (default 5m0s)
+    	interval at which to scrape the AWS API for MSK cluster information when in file_sd mode (default 5m0s)
   -tag value
     	A key=value for filtering by tags. Flag can be specified multiple times, resulting OR expression.
 ```

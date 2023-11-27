@@ -27,7 +27,7 @@ type tags map[string]string
 
 var (
 	outFile       = flag.String("output", "msk_file_sd.yml", "path of the file to write MSK discovery information to")
-	interval      = flag.Duration("scrape-interval", 5*time.Minute, "interval at which to scrape the AWS API for MSK cluster information")
+	interval      = flag.Duration("scrape-interval", 5*time.Minute, "interval at which to scrape the AWS API for MSK cluster information when in file_sd mode")
 	jobPrefix     = flag.String("job-prefix", "msk", "string with which to prefix each job label")
 	clusterFilter = flag.String("filter", "", "a regex pattern to filter cluster names from the results")
 	awsRegion     = flag.String("region", "", "the aws region in which to scan for MSK clusters")
