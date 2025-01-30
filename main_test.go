@@ -17,6 +17,7 @@ type mockCluster struct {
 	clusterName  string
 	jmxExporter  bool
 	nodeExporter bool
+	kraft        bool
 }
 
 type mockKafkaClient struct{ clusters map[string]mockCluster }
@@ -38,10 +39,10 @@ func (m mockKafkaClient) ListClusters(ctx context.Context, params *kafka.ListClu
 			OpenMonitoring: &types.OpenMonitoring{
 				Prometheus: &types.Prometheus{
 					JmxExporter: &types.JmxExporter{
-						EnabledInBroker: cCluster.jmxExporter,
+						EnabledInBroker: &cCluster.jmxExporter,
 					},
 					NodeExporter: &types.NodeExporter{
-						EnabledInBroker: cCluster.nodeExporter,
+						EnabledInBroker: &cCluster.nodeExporter,
 					},
 				},
 			},
@@ -56,6 +57,17 @@ func (m mockKafkaClient) ListClusters(ctx context.Context, params *kafka.ListClu
 func (m mockKafkaClient) ListNodes(ctx context.Context, params *kafka.ListNodesInput, optFns ...func(*kafka.Options)) (*kafka.ListNodesOutput, error) {
 	cluster := m.clusters[*params.ClusterArn]
 	var nodeInfos []types.NodeInfo
+
+	if cluster.kraft {
+		for i := 1; i <= cluster.brokerCount; {
+			n := types.NodeInfo{
+				NodeType:           "CONTROLLER",
+				ControllerNodeInfo: &types.ControllerNodeInfo{Endpoints: []string{fmt.Sprintf("c-1000%v.broker.com", i)}},
+			}
+			nodeInfos = append(nodeInfos, n)
+			i++
+		}
+	}
 
 	for i := 1; i <= cluster.brokerCount; {
 		n := types.NodeInfo{
@@ -75,7 +87,12 @@ func TestGetStaticConfigs(t *testing.T) {
 	t.Run("OneClusterTwoBrokersFullMonitoring", func(t *testing.T) {
 		var client mockKafkaClient
 		client.clusters = make(map[string]mockCluster)
-		client.clusters["arn:::my-cluster"] = mockCluster{2, "my-cluster", true, true}
+		client.clusters["arn:::my-cluster"] = mockCluster{
+			brokerCount:  2,
+			clusterName:  "my-cluster",
+			jmxExporter:  true,
+			nodeExporter: true,
+		}
 
 		got, _ := GetStaticConfigs(client)
 		want := []PrometheusStaticConfig{
@@ -98,11 +115,55 @@ func TestGetStaticConfigs(t *testing.T) {
 		}
 	})
 
+	t.Run("OneClusterTwoBrokersFullMonitoringKraft", func(t *testing.T) {
+		var client mockKafkaClient
+		client.clusters = make(map[string]mockCluster)
+		client.clusters["arn:::my-cluster"] = mockCluster{
+			brokerCount:  2,
+			clusterName:  "my-cluster",
+			jmxExporter:  true,
+			nodeExporter: true,
+			kraft:        true,
+		}
+
+		got, _ := GetStaticConfigs(client)
+		want := []PrometheusStaticConfig{
+			{
+				Targets: []string{
+					"c-10001.broker.com:11001",
+					"c-10002.broker.com:11001",
+					"b-1.broker.com:11001",
+					"b-1.broker.com:11002",
+					"b-2.broker.com:11001",
+					"b-2.broker.com:11002",
+				},
+				Labels: labels{
+					Job:         "msk-my-cluster",
+					ClusterName: "my-cluster",
+					ClusterArn:  "arn:::my-cluster",
+				},
+			},
+		}
+		if !reflect.DeepEqual(got, want) {
+			t.Errorf("got %s want %s", got, want)
+		}
+	})
+
 	t.Run("TwoClusterTwoBrokersFullAndLimitedMonitoring", func(t *testing.T) {
 		var client mockKafkaClient
 		client.clusters = make(map[string]mockCluster)
-		client.clusters["arn:::my-cluster"] = mockCluster{2, "my-cluster", true, true}
-		client.clusters["arn:::my-other-cluster"] = mockCluster{2, "my-other-cluster", true, false}
+		client.clusters["arn:::my-cluster"] = mockCluster{
+			brokerCount:  2,
+			clusterName:  "my-cluster",
+			jmxExporter:  true,
+			nodeExporter: true,
+		}
+		client.clusters["arn:::my-other-cluster"] = mockCluster{
+			brokerCount:  2,
+			clusterName:  "my-other-cluster",
+			jmxExporter:  true,
+			nodeExporter: false,
+		}
 
 		got, _ := GetStaticConfigs(client)
 		want := []PrometheusStaticConfig{
@@ -139,7 +200,10 @@ func TestGetStaticConfigs(t *testing.T) {
 	t.Run("NoMonitoringEnabled", func(t *testing.T) {
 		var client mockKafkaClient
 		client.clusters = make(map[string]mockCluster)
-		client.clusters["arn:::my-cluster"] = mockCluster{2, "my-cluster", false, false}
+		client.clusters["arn:::my-cluster"] = mockCluster{
+			brokerCount: 2,
+			clusterName: "my-cluster",
+		}
 
 		got, _ := GetStaticConfigs(client)
 		want := []PrometheusStaticConfig{}
@@ -183,7 +247,7 @@ func Test_filterClusters(t *testing.T) {
 		NameFilter: *(regexp.MustCompile(``)),
 		TagFilter: map[string]string{
 			"Enviroment": "test",
-			"SomeOther": "tag",
+			"SomeOther":  "tag",
 		},
 	}
 
@@ -244,14 +308,14 @@ func Test_filterClusters(t *testing.T) {
 							ClusterName: strPtr("test-cluster"),
 							Tags: map[string]string{
 								"Enviroment": "test",
-								"SomeOther": "DifferentTag",
+								"SomeOther":  "DifferentTag",
 							},
 						},
 						{
 							ClusterName: strPtr("second-test-cluster"),
 							Tags: map[string]string{
 								"Enviroment": "staging",
-								"SomeOther": "tag",
+								"SomeOther":  "tag",
 							},
 						},
 						{
@@ -265,16 +329,16 @@ func Test_filterClusters(t *testing.T) {
 				ClusterInfoList: []types.ClusterInfo{
 					{
 						ClusterName: strPtr("test-cluster"),
-						Tags:  map[string]string{
+						Tags: map[string]string{
 							"Enviroment": "test",
-							"SomeOther": "DifferentTag",
+							"SomeOther":  "DifferentTag",
 						},
 					},
 					{
 						ClusterName: strPtr("second-test-cluster"),
 						Tags: map[string]string{
 							"Enviroment": "staging",
-							"SomeOther": "tag",
+							"SomeOther":  "tag",
 						},
 					},
 				},
