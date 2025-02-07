@@ -5,9 +5,9 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"net/http"
+	"os"
 	"regexp"
 	"strings"
 	"time"
@@ -55,9 +55,13 @@ type PrometheusStaticConfig struct {
 
 // clusterDetails holds details of cluster, each broker, and which OpenMetrics endpoints are enabled
 type clusterDetails struct {
-	ClusterName  string
-	ClusterArn   string
-	Brokers      []string
+	ClusterName string
+	ClusterArn  string
+	Brokers     []brokerDetails
+}
+
+type brokerDetails struct {
+	Endpoint     string
 	JmxExporter  bool
 	NodeExporter bool
 }
@@ -70,6 +74,7 @@ type Filter struct {
 func (i *tags) String() string {
 	return fmt.Sprint(*i)
 }
+
 func (i *tags) Set(value string) error {
 	split := strings.Split(value, "=")
 
@@ -88,11 +93,11 @@ func (c clusterDetails) StaticConfig() PrometheusStaticConfig {
 
 	var targets []string
 	for _, b := range c.Brokers {
-		if c.JmxExporter {
-			targets = append(targets, fmt.Sprintf("%s:%d", b, jmxExporterPort))
+		if b.JmxExporter {
+			targets = append(targets, fmt.Sprintf("%s:%d", b.Endpoint, jmxExporterPort))
 		}
-		if c.NodeExporter {
-			targets = append(targets, fmt.Sprintf("%s:%d", b, nodeExporterPort))
+		if b.NodeExporter {
+			targets = append(targets, fmt.Sprintf("%s:%d", b.Endpoint, nodeExporterPort))
 		}
 	}
 	ret.Targets = targets
@@ -116,9 +121,9 @@ func getClusters(svc kafkaClient) (*kafka.ListClustersOutput, error) {
 }
 
 // getBrokers returns a slice of broker hosts without ports
-func getBrokers(svc kafkaClient, arn string) ([]string, error) {
-	input := kafka.ListNodesInput{ClusterArn: &arn}
-	var brokers []string
+func getBrokers(svc kafkaClient, c types.ClusterInfo) ([]brokerDetails, error) {
+	input := kafka.ListNodesInput{ClusterArn: c.ClusterArn}
+	var brokers []brokerDetails
 
 	p := kafka.NewListNodesPaginator(svc, &input)
 	for p.HasMorePages() {
@@ -128,7 +133,20 @@ func getBrokers(svc kafkaClient, arn string) ([]string, error) {
 		}
 
 		for _, b := range page.NodeInfoList {
-			brokers = append(brokers, b.BrokerNodeInfo.Endpoints...)
+			if b.BrokerNodeInfo != nil {
+				details := brokerDetails{
+					Endpoint:     b.BrokerNodeInfo.Endpoints[0],
+					JmxExporter:  *c.OpenMonitoring.Prometheus.JmxExporter.EnabledInBroker,
+					NodeExporter: *c.OpenMonitoring.Prometheus.NodeExporter.EnabledInBroker,
+				}
+				brokers = append(brokers, details)
+			} else if b.ControllerNodeInfo != nil {
+				details := brokerDetails{
+					Endpoint:    b.ControllerNodeInfo.Endpoints[0],
+					JmxExporter: *c.OpenMonitoring.Prometheus.JmxExporter.EnabledInBroker,
+				}
+				brokers = append(brokers, details)
+			}
 		}
 	}
 
@@ -137,18 +155,16 @@ func getBrokers(svc kafkaClient, arn string) ([]string, error) {
 
 // buildClusterDetails extracts the relevant details from a ClusterInfo and returns a ClusterDetails
 func buildClusterDetails(svc kafkaClient, c types.ClusterInfo) (clusterDetails, error) {
-	brokers, err := getBrokers(svc, *c.ClusterArn)
+	brokers, err := getBrokers(svc, c)
 	if err != nil {
 		fmt.Println(err)
 		return clusterDetails{}, err
 	}
 
 	cluster := clusterDetails{
-		ClusterName:  *c.ClusterName,
-		ClusterArn:   *c.ClusterArn,
-		Brokers:      brokers,
-		JmxExporter:  c.OpenMonitoring.Prometheus.JmxExporter.EnabledInBroker,
-		NodeExporter: c.OpenMonitoring.Prometheus.NodeExporter.EnabledInBroker,
+		ClusterName: *c.ClusterName,
+		ClusterArn:  *c.ClusterArn,
+		Brokers:     brokers,
 	}
 	return cluster, nil
 }
@@ -177,7 +193,7 @@ func filterClusters(clusters kafka.ListClustersOutput, filter Filter) *kafka.Lis
 }
 
 // GetStaticConfigs pulls a list of MSK clusters and brokers and returns a slice of PrometheusStaticConfigs
-func GetStaticConfigs(svc kafkaClient, opt_filter ...Filter) ([]PrometheusStaticConfig, error) {
+func GetStaticConfigs(svc kafkaClient, optFilter ...Filter) ([]PrometheusStaticConfig, error) {
 	clusters, err := getClusters(svc)
 	if err != nil {
 		return []PrometheusStaticConfig{}, err
@@ -189,8 +205,8 @@ func GetStaticConfigs(svc kafkaClient, opt_filter ...Filter) ([]PrometheusStatic
 	filter := Filter{
 		NameFilter: *defaultNameRegex,
 	}
-	if len(opt_filter) > 0 {
-		filter = opt_filter[0]
+	if len(optFilter) > 0 {
+		filter = optFilter[0]
 	}
 
 	clusters = filterClusters(*clusters, filter)
@@ -201,9 +217,10 @@ func GetStaticConfigs(svc kafkaClient, opt_filter ...Filter) ([]PrometheusStatic
 			return []PrometheusStaticConfig{}, err
 		}
 
-		if !clusterDetails.JmxExporter && !clusterDetails.NodeExporter {
+		if !*cluster.OpenMonitoring.Prometheus.JmxExporter.EnabledInBroker && !*cluster.OpenMonitoring.Prometheus.NodeExporter.EnabledInBroker {
 			continue
 		}
+
 		staticConfigs = append(staticConfigs, clusterDetails.StaticConfig())
 	}
 	return staticConfigs, nil
@@ -211,7 +228,6 @@ func GetStaticConfigs(svc kafkaClient, opt_filter ...Filter) ([]PrometheusStatic
 
 func fileSD(client *kafka.Client, filter Filter) {
 	work := func() {
-
 		staticConfigs, err := GetStaticConfigs(client, filter)
 		if err != nil {
 			fmt.Println(err)
@@ -225,7 +241,7 @@ func fileSD(client *kafka.Client, filter Filter) {
 		}
 
 		log.Printf("Writing %d discovered exporters to %s", len(staticConfigs), *outFile)
-		err = ioutil.WriteFile(*outFile, m, 0644)
+		err = os.WriteFile(*outFile, m, 0644)
 		if err != nil {
 			fmt.Println(err)
 			return
@@ -259,14 +275,13 @@ func httpSD(client *kafka.Client, filter Filter) {
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.Write(m)
-		return
 	})
 
 	log.Fatal(http.ListenAndServe(*listenAddress, nil))
 }
 
 func main() {
-	var tagFilters tags = make(tags)
+	tagFilters := make(tags)
 	flag.Var(&tagFilters, "tag", "A key=value for filtering by tags. Flag can be specified multiple times, resulting OR expression.")
 	flag.Parse()
 
