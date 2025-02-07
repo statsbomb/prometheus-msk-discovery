@@ -1,6 +1,6 @@
 module github.com/statsbomb/prometheus-msk-discovery
 
-go 1.21
+go 1.23
 
 require (
 	github.com/aws/aws-sdk-go-v2/config v1.29.2
