@@ -223,7 +223,6 @@ func TestGetStaticConfigs(t *testing.T) {
 			t.Errorf("got %s want %s", got, want)
 		}
 	})
-
 }
 
 func strPtr(str string) *string {
@@ -246,8 +245,8 @@ func Test_filterClusters(t *testing.T) {
 	tagFilter := Filter{
 		NameFilter: *(regexp.MustCompile(``)),
 		TagFilter: map[string]string{
-			"Enviroment": "test",
-			"SomeOther":  "tag",
+			"Environment": "test",
+			"SomeOther":   "tag",
 		},
 	}
 
@@ -307,15 +306,15 @@ func Test_filterClusters(t *testing.T) {
 						{
 							ClusterName: strPtr("test-cluster"),
 							Tags: map[string]string{
-								"Enviroment": "test",
-								"SomeOther":  "DifferentTag",
+								"Environment": "test",
+								"SomeOther":   "DifferentTag",
 							},
 						},
 						{
 							ClusterName: strPtr("second-test-cluster"),
 							Tags: map[string]string{
-								"Enviroment": "staging",
-								"SomeOther":  "tag",
+								"Environment": "staging",
+								"SomeOther":   "tag",
 							},
 						},
 						{
@@ -330,15 +329,15 @@ func Test_filterClusters(t *testing.T) {
 					{
 						ClusterName: strPtr("test-cluster"),
 						Tags: map[string]string{
-							"Enviroment": "test",
-							"SomeOther":  "DifferentTag",
+							"Environment": "test",
+							"SomeOther":   "DifferentTag",
 						},
 					},
 					{
 						ClusterName: strPtr("second-test-cluster"),
 						Tags: map[string]string{
-							"Enviroment": "staging",
-							"SomeOther":  "tag",
+							"Environment": "staging",
+							"SomeOther":   "tag",
 						},
 					},
 				},
